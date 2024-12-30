@@ -52,6 +52,19 @@ func (g *Game) NewApple() {
 				continue
 			}
 
+			stop := false
+
+			for _, segment := range g.Tail {
+				if (Vector2Int{x, y}).Equals(segment.Position) {
+					stop = true
+					continue
+				}
+			}
+
+			if stop {
+				continue
+			}
+
 			validPositions = append(validPositions, Vector2Int{x, y})
 		}
 	}
