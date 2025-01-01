@@ -9,10 +9,6 @@ import (
 // Enum
 type GameState int
 
-func (g GameState) String() string {
-	return [...]string{"Playing", "Paused", "GameOver", "HomeScreen"}[g]
-}
-
 const (
 	Playing GameState = iota
 	Paused
