@@ -9,6 +9,8 @@ func Start(game *Game, app *App) {
 }
 
 func Update(game *Game, app *App) {
+
+	UpdateHighScore(game)
 	switch game.State {
 	case Playing:
 		game.TimeSinceLastMove = game.TimeSinceLastMove + game.Dt
@@ -37,10 +39,16 @@ func Update(game *Game, app *App) {
 
 	case Paused:
 		UnpauseIfSpacePressed(game)
-	case GameOver:
+	case GameOver, WinScreen:
 		GoToHomeScreenIfSpacePressed(game)
 	case HomeScreen:
 		SwitchToPlayingIfSpacePressed(game)
+	}
+}
+
+func UpdateHighScore(game *Game) {
+	if game.Score > game.HighScore {
+		game.HighScore = game.Score
 	}
 }
 
@@ -66,13 +74,17 @@ func UpdatePlayerVelocity(game *Game) {
 		vel = Vector2Int{0, 0}
 	}
 
-	if vel.Length() > 0 {
-		game.Velocity = vel
+	if !vel.Equals(Vector2Int{0, 0}) {
+		game.InputVelocity = vel
 	}
 
 }
 
 func MovePlayer(game *Game) {
+
+	if !game.InputVelocity.Equals(Vector2Int{0, 0}) {
+		game.Velocity = game.InputVelocity
+	}
 
 	game.Position = game.Position.Add(game.Velocity)
 	game.LastPosition = game.Position
@@ -94,10 +106,23 @@ func KillIfHitTail(game *Game) {
 
 func CollectAppleIfPlayerOnApple(game *Game) {
 	if game.Position.Equals(game.ApplePosition) {
-		game.NewApple()
+		noSpace := game.NewApple()
+		if noSpace {
+			WinGame(game)
+		}
 		game.Score += 1
+
+		// Increase all tail segment lifetimes
+		for i := 0; i < len(game.Tail); i++ {
+			game.Tail[i].Lifetime += 1
+		}
 	}
 
+}
+
+func WinGame(game *Game) {
+	ChangeState(game, WinScreen)
+	ResetGame(game)
 }
 
 func TickTailSegments(game *Game) {
@@ -147,6 +172,7 @@ func ResetGame(g *Game) {
 	g.Tail = make([]TailSegment, 0, 100)
 	g.Position = Vector2Int{g.WorldSize.X / 2, g.WorldSize.Y / 2}
 	g.Velocity = Vector2Int{0, 1}
+	g.InputVelocity = Vector2Int{0, 1}
 	g.NewApple()
 	g.Score = 0
 }

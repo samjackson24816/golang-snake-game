@@ -1,5 +1,7 @@
 package main
 
+import "math"
+
 type Vector2Int struct {
 	X int32
 	Y int32
@@ -39,4 +41,12 @@ func (v Vector2Int) Dot(other Vector2Int) int32 {
 
 func (v Vector2Int) Equals(other Vector2Int) bool {
 	return v.X == other.X && v.Y == other.Y
+}
+
+func (v Vector2Int) AngleDeg() float64 {
+	return math.Atan2(float64(v.Y), float64(v.X)) * 180 / math.Pi
+}
+
+func (v Vector2Int) Cross(other Vector2Int) float32 {
+	return float32(v.X)*float32(other.Y) - float32(v.Y)*float32(other.X)
 }

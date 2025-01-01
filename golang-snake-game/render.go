@@ -2,37 +2,130 @@ package main
 
 import (
 	"fmt"
-	"math"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-func Render(game *Game, app *App) {
-	switch game.State {
-	case Playing:
-		RenderPlaying(game, app)
-	case Paused:
-		// Render Paused in the middle of the screen
-		RenderPaused(game, app)
-	case GameOver:
-		// Render Game Over in the middle of the screen
-		RenderGameOver(game, app)
-	case HomeScreen:
-		RenderHomeScreen(game, app)
+func StartRender(game *Game, app *App) {
+
+	app.Texture = rl.LoadTexture("assets/spritesheet.png")
+
+	// Initialize background offsets
+	TS := float32(16.0)
+
+	app.BackgroundTexOffsets = []rl.Rectangle{
+		rl.NewRectangle(0, 0, TS, TS),
+		rl.NewRectangle(TS, 0, TS, TS),
+		rl.NewRectangle(TS*2, 0, TS, TS),
+		rl.NewRectangle(TS*3, 0, TS, TS),
+	}
+
+	app.AppleTexOffset = rl.NewRectangle(TS*4, 0, TS, TS)
+
+	app.SnakeHeadOffset = rl.NewRectangle(TS*5, 0, TS, TS)
+
+	app.SnakeTailStraightOffset = rl.NewRectangle(TS*6, 0, TS, TS)
+
+	app.SnakeTailCornerOffsets = []rl.Rectangle{
+		rl.NewRectangle(TS*7, 0, TS, TS),
+		rl.NewRectangle(TS*8, 0, TS, TS),
+	}
+
+	app.SnakeTailEndOffset = rl.NewRectangle(TS*9, 0, TS, TS)
+
+	app.BackgroundTileOffsets = make([]int32, game.WorldSize.X*game.WorldSize.Y)
+
+	for i := int32(0); i < game.WorldSize.X; i++ {
+		for j := int32(0); j < game.WorldSize.Y; j++ {
+			index := (i*43 + (j * 61)) % int32(len(app.BackgroundTexOffsets))
+			app.BackgroundTileOffsets[i+j*game.WorldSize.X] = index
+		}
 	}
 
 }
 
-func RenderGame(game *Game, app *App) {
+func Render(game *Game, app *App) {
 
-	rl.ClearBackground(rl.RayWhite)
+	rl.BeginDrawing()
 
+	RenderBackground(game, app)
+	switch game.State {
+	case Playing:
+		RenderApple(game, app)
+		RenderSnake(game, app)
+		RenderScoreUI(game, app)
+	case Paused:
+		RenderApple(game, app)
+		RenderSnake(game, app)
+		RenderScoreUI(game, app)
+		RenderPaused(game, app)
+	case GameOver:
+		RenderGameOver(game, app)
+	case HomeScreen:
+		RenderHomeScreen(game, app)
+	case WinScreen:
+		RenderWinScreen(game, app)
+	}
+
+	rl.EndDrawing()
+}
+
+func RenderBackground(game *Game, app *App) {
+	screenPerWorldX := float32(app.ScreenSize.X / game.WorldSize.X)
+	screenPerWorldY := float32(app.ScreenSize.Y / game.WorldSize.Y)
+
+	// Render the background
+	for i := int32(0); i < game.WorldSize.X; i++ {
+		for j := int32(0); j < game.WorldSize.Y; j++ {
+			offset := app.BackgroundTexOffsets[app.BackgroundTileOffsets[i+j*game.WorldSize.X]]
+			rl.DrawTexturePro(app.Texture, offset, rl.NewRectangle(float32(i)*screenPerWorldX, float32(j)*screenPerWorldY, screenPerWorldX, screenPerWorldY), rl.NewVector2(0, 0), 0, rl.White)
+		}
+	}
+}
+
+func RenderWinScreen(game *Game, app *App) {
+
+	textWidth := rl.MeasureText("You Win!", 40)
+
+	rl.DrawText("You Win!", app.ScreenSize.X/2-textWidth/2, app.ScreenSize.Y/2, 40, rl.White)
+}
+
+func RenderApple(game *Game, app *App) {
+	// Render the apple
+	screenPerWorldX := float32(app.ScreenSize.X / game.WorldSize.X)
+	screenPerWorldY := float32(app.ScreenSize.Y / game.WorldSize.Y)
+
+	rl.DrawTexturePro(app.Texture, app.AppleTexOffset, rl.NewRectangle(float32(game.ApplePosition.X)*screenPerWorldX, float32(game.ApplePosition.Y)*screenPerWorldY, screenPerWorldX, screenPerWorldY), rl.NewVector2(0, 0), 0, rl.White)
+
+}
+
+func RenderScoreUI(game *Game, app *App) {
+
+	// Write the score at the top right corner
+
+	scoreText := fmt.Sprintf("%d", game.Score)
+	textWidth := rl.MeasureText(scoreText, 40)
+
+	rl.DrawText(scoreText, app.ScreenSize.X-textWidth-5, 5, 40, rl.White)
+
+	highScoreText := fmt.Sprintf("%d", game.HighScore)
+
+	rl.DrawText(highScoreText, 5, 5, 40, rl.White)
+}
+
+func RenderSnake(game *Game, app *App) {
 	screenPerWorldX := float32(app.ScreenSize.X / game.WorldSize.X)
 	screenPerWorldY := float32(app.ScreenSize.Y / game.WorldSize.Y)
 
 	// Render the head
 
-	rl.DrawRectangle(game.Position.X*int32(screenPerWorldX), game.Position.Y*int32(screenPerWorldY), int32(screenPerWorldX), int32(screenPerWorldY), rl.Black)
+	headAngle := game.Velocity.AngleDeg() + 90
+
+	position := rl.NewVector2((float32(game.Position.X)+0.5)*screenPerWorldX, (float32(game.Position.Y)+0.5)*screenPerWorldY)
+
+	rotationCenter := rl.NewVector2(screenPerWorldX/2, screenPerWorldY/2)
+
+	rl.DrawTexturePro(app.Texture, app.SnakeHeadOffset, rl.NewRectangle(position.X, position.Y, screenPerWorldX, screenPerWorldY), rotationCenter, float32(headAngle), rl.White)
 
 	// Render the tail
 	for i, segment := range game.Tail {
@@ -48,8 +141,19 @@ func RenderGame(game *Game, app *App) {
 		dirNext := next.Sub(segment.Position)
 
 		var prev Vector2Int
+
 		if i == 0 {
-			prev = next.Scale(-1)
+			// Last segment
+			// 0 is up, 1 is right, 2 is down, 3 is left
+			angle := dirNext.AngleDeg() + 90
+
+			position := rl.NewVector2((float32(segment.Position.X)+0.5)*screenPerWorldX, (float32(segment.Position.Y)+0.5)*screenPerWorldY)
+
+			rotationCenter := rl.NewVector2(screenPerWorldX/2, screenPerWorldY/2)
+
+			rl.DrawTexturePro(app.Texture, app.SnakeTailEndOffset, rl.NewRectangle(position.X, position.Y, screenPerWorldX, screenPerWorldY), rotationCenter, float32(angle), rl.White)
+			continue
+
 		} else {
 			prev = game.Tail[i-1].Position
 		}
@@ -63,151 +167,85 @@ func RenderGame(game *Game, app *App) {
 
 		if isCorner {
 
-			// Render the corner as two intersecting rectangles
+			// 0 is up, 1 is right, 2 is down, 3 is left
+			angleNext := int32(dirNext.AngleDeg()) + 90
+			anglePrev := int32(dirPrev.AngleDeg()) + 90
 
-			// Previous segment
-			var x, y, w, h int32
+			// If the tail is turning right, the corner is the first corner in the sprite sheet
+			// If the tail is turning left, the corner is the second corner in the sprite sheet
+			// This is because the corners are in clockwise order in the sprite sheet
 
-			if dirPrev.X == 0 && dirPrev.Y == 1 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64(float32(segment.Position.Y) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY * 0.75)))
-				w = int32(math.Round(float64(screenPerWorldX / 2)))
-			} else if dirPrev.X == 0 && dirPrev.Y == -1 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY * 0.75)))
-				w = int32(math.Round(float64(screenPerWorldX / 2)))
-			} else if dirPrev.X == 1 && dirPrev.Y == 0 {
-				x = int32(math.Round(float64(float32(segment.Position.X) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY / 2)))
-				w = int32(math.Round(float64(screenPerWorldX * 0.75)))
-			} else if dirPrev.X == -1 && dirPrev.Y == 0 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY / 2)))
-				w = int32(math.Round(float64(screenPerWorldX * 0.75)))
+			index := 0
+
+			if angleNext == anglePrev+90 || angleNext == anglePrev-270 {
+				index = 0
+			} else {
+				index = 1
 			}
 
-			rl.DrawRectangle(x, y, w, h, rl.Black)
+			position := rl.NewVector2((float32(segment.Position.X)+0.5)*screenPerWorldX, (float32(segment.Position.Y)+0.5)*screenPerWorldY)
 
-			// Next segment
-			if dirNext.X == 0 && dirNext.Y == 1 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY * 0.75)))
-				w = int32(math.Round(float64(screenPerWorldX / 2)))
-			} else if dirNext.X == 0 && dirNext.Y == -1 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64(float32(segment.Position.Y) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY * 0.75)))
-				w = int32(math.Round(float64(screenPerWorldX / 2)))
-			} else if dirNext.X == 1 && dirNext.Y == 0 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY / 2)))
-				w = int32(math.Round(float64(screenPerWorldX * 0.75)))
-			} else if dirNext.X == -1 && dirNext.Y == 0 {
-				x = int32(math.Round(float64(float32(segment.Position.X) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY / 2)))
-				w = int32(math.Round(float64(screenPerWorldX * 0.75)))
-			}
+			rotationCenter := rl.NewVector2(screenPerWorldX/2, screenPerWorldY/2)
 
-			rl.DrawRectangle(x, y, w, h, rl.Black)
+			rl.DrawTexturePro(app.Texture, app.SnakeTailCornerOffsets[index], rl.NewRectangle(position.X, position.Y, screenPerWorldX, screenPerWorldY), rotationCenter, float32(angleNext), rl.White)
 
 		} else {
 
-			// Render the straight segment
+			// 0 is up, 1 is right, 2 is down, 3 is left
+			angle := dirNext.AngleDeg() + 90
 
-			var x, y, w, h int32
+			position := rl.NewVector2((float32(segment.Position.X)+0.5)*screenPerWorldX, (float32(segment.Position.Y)+0.5)*screenPerWorldY)
 
-			if dirNext.X == 0 && dirNext.Y == 1 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64(float32(segment.Position.Y) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY)))
-				w = int32(math.Round(float64(screenPerWorldX / 2)))
-			} else if dirNext.X == 0 && dirNext.Y == -1 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0.25) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY)))
-				w = int32(math.Round(float64(screenPerWorldX / 2)))
-			} else if dirNext.X == 1 && dirNext.Y == 0 {
-				x = int32(math.Round(float64(float32(segment.Position.X) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY / 2)))
-				w = int32(math.Round(float64(screenPerWorldX)))
-			} else if dirNext.X == -1 && dirNext.Y == 0 {
-				x = int32(math.Round(float64((float32(segment.Position.X) + 0) * screenPerWorldX)))
-				y = int32(math.Round(float64((float32(segment.Position.Y) + 0.25) * screenPerWorldY)))
-				h = int32(math.Round(float64(screenPerWorldY / 2)))
-				w = int32(math.Round(float64(screenPerWorldX)))
-			}
+			rotationCenter := rl.NewVector2(screenPerWorldX/2, screenPerWorldY/2)
 
-			rl.DrawRectangle(x, y, w, h, rl.Black)
+			rl.DrawTexturePro(app.Texture, app.SnakeTailStraightOffset, rl.NewRectangle(position.X, position.Y, screenPerWorldX, screenPerWorldY), rotationCenter, float32(angle), rl.White)
 
 		}
 
 	}
 
-	// Render the apple as a red elipse
-
-	rl.DrawEllipse(int32(float32(game.ApplePosition.X)*screenPerWorldX+screenPerWorldX/2), int32(float32(game.ApplePosition.Y)*screenPerWorldY+screenPerWorldY/2), screenPerWorldX/2, screenPerWorldY/2, rl.Red)
-
-	// Write the score at the top right corner
-
-	scoreText := fmt.Sprintf("Score: %d", game.Score)
-	textWidth := rl.MeasureText(scoreText, 20)
-
-	rl.DrawText(scoreText, app.ScreenSize.X-textWidth-5, 5, 20, rl.Black)
-
-}
-
-func RenderPlaying(game *Game, app *App) {
-
-	rl.BeginDrawing()
-	RenderGame(game, app)
-	rl.EndDrawing()
 }
 
 func RenderPaused(game *Game, app *App) {
 
-	rl.BeginDrawing()
-
-	RenderGame(game, app)
-
 	rl.DrawRectangle(0, 0, app.ScreenSize.X, app.ScreenSize.Y, rl.Fade(rl.RayWhite, 0.5))
 
-	textWidth := rl.MeasureText("Paused", 20)
+	textWidth := rl.MeasureText("Paused", 40)
 
-	rl.DrawText("Paused", app.ScreenSize.X/2-textWidth/2, app.ScreenSize.Y/2, 20, rl.Black)
+	rl.DrawText("Paused", app.ScreenSize.X/2-textWidth/2, app.ScreenSize.Y/2, 40, rl.White)
 
-	rl.EndDrawing()
 }
 
 func RenderGameOver(game *Game, app *App) {
 
-	rl.BeginDrawing()
+	textWidth := rl.MeasureText("Game Over", 40)
 
-	rl.ClearBackground(rl.RayWhite)
+	rl.DrawText("Game Over", app.ScreenSize.X/2-textWidth/2, app.ScreenSize.Y/2, 40, rl.White)
 
-	textWidth := rl.MeasureText("Game Over", 20)
+	RenderScores(game, app)
 
-	rl.DrawText("Game Over", app.ScreenSize.X/2-textWidth/2, app.ScreenSize.Y/2, 20, rl.Black)
+}
 
-	rl.EndDrawing()
+func RenderScores(game *Game, app *App) {
+	scoreWidth := rl.MeasureText(fmt.Sprintf("Score: %d", game.Score), 30)
+
+	rl.DrawText(fmt.Sprintf("Score: %d", game.Score), app.ScreenSize.X/2-scoreWidth/2, app.ScreenSize.Y/2+50, 30, rl.White)
+
+	highScoreWidth := rl.MeasureText(fmt.Sprintf("High Score: %d", game.HighScore), 30)
+
+	rl.DrawText(fmt.Sprintf("High Score: %d", game.HighScore), app.ScreenSize.X/2-highScoreWidth/2, app.ScreenSize.Y/2+80, 30, rl.White)
+
 }
 
 func RenderHomeScreen(game *Game, app *App) {
 
-	rl.BeginDrawing()
-
 	rl.ClearBackground(rl.RayWhite)
 
-	textWidth := rl.MeasureText("Press Space to Start", 20)
+	textWidth := rl.MeasureText("Press Space to Start", 40)
 
-	rl.DrawText("Press Space to Start", app.ScreenSize.X/2-textWidth/2, app.ScreenSize.Y/2, 20, rl.Black)
+	rl.DrawText("Press Space to Start", app.ScreenSize.X/2-textWidth/2, app.ScreenSize.Y/2, 40, rl.White)
 
-	rl.EndDrawing()
+	highScoreWidth := rl.MeasureText(fmt.Sprintf("High Score: %d", game.HighScore), 30)
+
+	rl.DrawText(fmt.Sprintf("High Score: %d", game.HighScore), app.ScreenSize.X/2-highScoreWidth/2, app.ScreenSize.Y/2+80, 30, rl.White)
 }

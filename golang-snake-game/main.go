@@ -18,6 +18,7 @@ const (
 	Paused
 	GameOver
 	HomeScreen
+	WinScreen
 )
 
 type TailSegment struct {
@@ -35,14 +36,16 @@ type Game struct {
 	WorldSize            Vector2Int
 	LastPosition         Vector2Int
 	Position             Vector2Int
+	InputVelocity        Vector2Int
 	Velocity             Vector2Int
 	ApplePosition        Vector2Int
 	Score                uint
+	HighScore            uint
 	Tail                 []TailSegment
 	StartingTailSegments uint
 }
 
-func (g *Game) NewApple() {
+func (g *Game) NewApple() (noSpace bool) {
 	// Make a list of all the valid positions
 	validPositions := make([]Vector2Int, 0, g.WorldSize.X*g.WorldSize.Y)
 
@@ -69,6 +72,10 @@ func (g *Game) NewApple() {
 		}
 	}
 
+	if len(validPositions) == 0 {
+		return true
+	}
+
 	// Remove the positions that are occupied by the snake
 	for _, segment := range g.Tail {
 		for i, pos := range validPositions {
@@ -80,6 +87,8 @@ func (g *Game) NewApple() {
 
 	// Choose a random position from the valid positions
 	g.ApplePosition = validPositions[rl.GetRandomValue(0, int32(len(validPositions)-1))]
+
+	return false
 
 }
 
@@ -100,7 +109,15 @@ func NewGame(worldSize Vector2Int) (g Game) {
 
 // The state of the user interface
 type App struct {
-	ScreenSize Vector2Int
+	ScreenSize              Vector2Int
+	Texture                 rl.Texture2D
+	BackgroundTileOffsets   []int32
+	BackgroundTexOffsets    []rl.Rectangle
+	AppleTexOffset          rl.Rectangle
+	SnakeHeadOffset         rl.Rectangle
+	SnakeTailStraightOffset rl.Rectangle
+	SnakeTailCornerOffsets  []rl.Rectangle
+	SnakeTailEndOffset      rl.Rectangle
 }
 
 func (a *App) Init(screenSize Vector2Int) {
@@ -115,10 +132,10 @@ func NewApp(screenSize Vector2Int) (a App) {
 func main() {
 
 	game := NewGame(Vector2Int{8, 8})
-	app := NewApp(Vector2Int{800, 800})
+	app := NewApp(Vector2Int{1000, 1000})
 
-	game.MoveTime = 0.5
-	game.StartingTailSegments = 3
+	game.MoveTime = 0.4
+	game.StartingTailSegments = 1
 
 	rl.InitWindow(int32(app.ScreenSize.X), int32(app.ScreenSize.Y), "Snake")
 
@@ -127,6 +144,7 @@ func main() {
 	rl.SetTargetFPS(60)
 
 	Start(&game, &app)
+	StartRender(&game, &app)
 
 	for !rl.WindowShouldClose() {
 		game.Dt = rl.GetFrameTime()
