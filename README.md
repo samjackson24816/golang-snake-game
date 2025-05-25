@@ -2,4 +2,4 @@
 A simple snake game built in Go using Raylib
 
 ## Demo
-<img src="./gameplay.gif"/>
+<img src="./Snake-Gameplay.gif"/>
